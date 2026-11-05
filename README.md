@@ -1,85 +1,101 @@
 # Salesforce Workspace
 
-CloudVandana Associate Software Engineer assignment for Abishek Budhiraja.
+My submission for the CloudVandana Associate Software Engineer assignment.
 
-A local React application with a Python/FastAPI backend. Salesforce remains the source of truth: the app uses Salesforce REST APIs and the signed-in user's permissions. No custom Apex or LWC deployment is required for these standard-object operations.
+This app connects to a Salesforce Developer Org and lets you manage Accounts, Opportunities, Leads, Contacts and Cases from one screen. It uses React for the frontend and Python with FastAPI for the backend. Records are read from and saved directly to Salesforce through its REST API.
 
-## Assignment requirements
+## Features
 
-- [x] Log in through an External Client App using OAuth authorization code + PKCE.
-- [x] Select Account, Opportunity, Lead, Contact or Case from one dropdown.
-- [x] Display 5–10 fields for the selected object, respecting available metadata.
-- [x] Create, view, update and delete records through this application.
-- [x] Load records in pages of 20 and load the next page when scrolling to the end.
-- [x] Run on a local server and document reviewer access.
-- [x] Complete live-org verification for all five objects.
-- [ ] Send the repository link and updated resume after final submission review.
+- Sign in to Salesforce using OAuth 2.0 through an External Client App.
+- Switch between the five objects using a dropdown.
+- View records and create, edit or delete them.
+- Display 9 fields for each object and 10 for Case, with form labels and field settings taken from Salesforce.
+- Load 20 records initially, then load the next 20 when scrolling to the bottom. There is also a button to load more.
+- Show Salesforce validation errors and respect the signed-in user's permissions.
 
-Live verification was completed on 6 November 2026. See [VERIFICATION.md](VERIFICATION.md) for the scope, evidence and cleanup. Sending the application is a separate final step.
+## Run locally
 
-## Local setup
+The app was tested on macOS with Python 3.13 and Node.js 22.17. You will also need a Salesforce Developer Org and an External Client App configured as described below.
 
-Verified environment: Python 3.13 and Node.js 22.17. The frontend needs a Node version supported by the locked Vite release.
+```sh
+git clone https://github.com/Abishek-21/cloudvandana-salesforce-workspace.git
+cd cloudvandana-salesforce-workspace
+cp .env.example .env
+```
 
-1. Open this folder in VS Code.
-2. Create a Python environment: `python3 -m venv .venv`.
-3. Install the backend: `.venv/bin/python -m pip install -r requirements.lock.txt`.
-4. Install frontend packages: `npm ci`.
-5. Copy `.env.example` to `.env` and complete the Salesforce settings locally.
-6. Run `sh run-local.sh` and open **http://localhost:8008**.
+Fill in the Salesforce settings in `.env`, then run:
 
-The interface can be previewed without credentials. Salesforce operations require a configured External Client App and successful consent. Restart the server after changing `.env`.
+```sh
+sh run-local.sh
+```
 
-## Salesforce setup
+The script creates a Python environment, installs missing dependencies, builds the frontend and starts the server. Open [http://localhost:8008](http://localhost:8008), then sign in to Salesforce.
 
-The app's OAuth authorization is separate from signing VS Code/Salesforce CLI into an org.
+Use `Control+C` to stop the server. Restart it after changing `.env`.
 
-In the Developer Org's Setup, create a **local External Client App**:
+## Connect Salesforce
 
-- Name: `CloudVandana Salesforce Workspace`.
-- Callback URL: `http://localhost:8008/auth/callback` (must match `.env` exactly).
-- Enable OAuth with `api` and `refresh_token` / `offline_access` scopes.
-- Enable the authorization code / web server flow and require PKCE.
-- Require the consumer secret for the web server flow and refresh token flow.
-- Allow the intended Developer Org user to authorize the application under its OAuth policies.
-- Obtain the consumer key and secret and enter them in the local `.env` file.
+In your Developer Org's Setup, create a local **External Client App** with these settings:
 
-Use the org's My Domain URL for `SALESFORCE_LOGIN_URL`. Do not use a Lightning page URL, a sandbox belonging to an employer, or a production org. Do not commit `.env` or authorization files. Log in and grant consent in the browser yourself.
+| Setting | Value |
+| --- | --- |
+| App name | CloudVandana Salesforce Workspace |
+| Callback URL | `http://localhost:8008/auth/callback` |
+| OAuth scopes | `api` and `refresh_token` / `offline_access` |
+| Flow | Authorization code / web server flow with PKCE |
+| Consumer secret | Required for the web server and refresh token flows |
 
-If connecting the CLI as well, use Salesforce's documented `sf org login web` flow for your org and the applicable External Client App settings. The CLI's default callback (`http://localhost:1717/OauthRedirect`) is different from this app's callback. Do not substitute a CLI access token for the app's login flow.
+Allow your user to authorize the app in its OAuth policies. Copy the consumer key and secret into `.env`:
 
-## Local hosting and review
+```dotenv
+SALESFORCE_LOGIN_URL=https://YOUR-DOMAIN.my.salesforce.com
+SALESFORCE_CLIENT_ID=your_consumer_key
+SALESFORCE_CLIENT_SECRET=your_consumer_secret
+SALESFORCE_CALLBACK_URL=http://localhost:8008/auth/callback
+SALESFORCE_API_VERSION=
+```
 
-`localhost` is reachable only on the computer running this application. A reviewer cannot open your Mac's localhost from their computer. The PDF says both "free online server" and "local server"; confirm whether they want to run the repository themselves, view a live demonstration, or receive an externally reachable hosted link. No public deployment or tunnel is configured without resolving that requirement.
+Use your org's My Domain URL for the login URL. Leaving the API version blank lets the backend discover it from Salesforce. The callback URL must match the External Client App exactly.
 
-## Implementation
+The `.env` file is excluded from Git. Keep the consumer secret there, on the backend. Salesforce CLI login is not required to run this app.
 
-`src/main.jsx` contains the React interface and metadata-driven record dialog. `backend/main.py` contains OAuth, session management, validation and REST API routes. `tests/` contains fake Salesforce responses and automated tests; the real application does not import these test fixtures.
+## How it works
 
-- Salesforce describes each object so forms use its field labels, field types, active picklist values, required fields and edit permissions.
-- Each object has a configured selection of nine or ten fields. Required custom fields are added by replacing optional fields within the ten-field limit. If the org cannot satisfy that limit, the app shows an error instead of silently dropping required fields.
-- Records use `ORDER BY Id ASC LIMIT 20` and an ID cursor. This avoids an ever-growing SOQL OFFSET. After a create, the new record is shown first; Reload restores the server's ID order. IDs are de-duplicated between pages.
-- Write requests carry a CSRF token. OAuth uses a browser-bound state value, a one-use authorization code and PKCE.
-- Access and refresh tokens stay in process memory. The browser receives only an opaque HttpOnly session cookie and a CSRF token. Restarting the server clears sessions. Run one local worker.
-- The backend discovers a supported REST API version from the connected org unless an explicit version is configured.
-- New records stay visible after creation. The save path distinguishes a successful write from a failed subsequent read, preventing an accidental duplicate retry.
+The React frontend calls the FastAPI backend, which handles login and sends requests to Salesforce. Access and refresh tokens stay on the server; the browser uses a session cookie. OAuth uses PKCE and a state check, and record changes require a CSRF token.
 
-## Tests and demo
+The backend reads Salesforce object metadata to get field labels, types, picklist values and required fields. If an org has extra required fields, it replaces optional fields while keeping the form within the assignment's ten-field limit.
 
-Run `.venv/bin/python -m pytest -q` for backend tests and `npm run build` for the frontend build. The exact installed Python versions are captured in `requirements.lock.txt`; `requirements.txt` records the direct dependency ranges.
+Pagination uses the last record's ID to fetch the next 20 records. Newly created records appear at the top so they are easy to find. Reloading restores the normal ID order.
 
-For a demonstration: sign in, choose each object, open a record, create a clearly identified sample, edit it, then delete only that sample. To demonstrate pagination, use an object with more than 20 records and scroll the table to the end. A manual "Load next 20 records" button is also available.
+| File | Purpose |
+| --- | --- |
+| `src/main.jsx` | Object selector, records table and forms |
+| `src/styles.css` | Page layout and styling |
+| `backend/main.py` | OAuth, sessions and Salesforce API calls |
+| `tests/` | Backend tests with mock Salesforce responses |
+| `run-local.sh` | Local setup and startup script |
 
-## Known boundaries
+## Testing
 
-This is a single-machine assessment application, not a multi-worker production service. Sessions are intentionally not persisted. Custom validation rules, duplicate rules, dependent picklists and record-type restrictions remain enforced by Salesforce; errors are shown to the user. Reference fields accept Salesforce record IDs rather than providing a separate lookup-search component. Read-only fields are available in the table and view dialog but excluded from create/edit forms.
+```sh
+.venv/bin/python -m pytest -q
+npm run build
+```
 
-Account fields: Id, Name, Type, Industry, Phone, Website, BillingCity, BillingCountry, Description. Opportunity: Id, Name, StageName, CloseDate, Amount, AccountId, Probability, Type, Description. Lead: Id, FirstName, LastName, Company, Email, Phone, Status, Title, Description. Contact: Id, FirstName, LastName, AccountId, Email, Phone, Title, Department, Description. Case: Id, CaseNumber, Subject, Status, Priority, Origin, ContactId, AccountId, Description, SuppliedEmail.
+On 6 November 2026, all 15 backend tests and the frontend build passed. Live checks in the Developer Org also passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
 
-Automated tests use fake Salesforce responses. They do not replace the live-org verification documented separately.
+More details are in [VERIFICATION.md](VERIFICATION.md).
 
-## References
+## Current limitations
 
-- Salesforce web server OAuth flow: https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm&type=5
-- Salesforce REST API: https://developer.salesforce.com/docs/platform/api-rest/guide/intro_rest.html
-- Salesforce CLI authorization: https://developer.salesforce.com/docs/platform/sfdx-dev/guide/sfdx-dev-auth-eca.html
+- This version runs locally. Reviewers can clone the repository and connect their own Developer Org; the localhost link only works on the computer running the server.
+- Sessions are stored in memory, so restarting the server requires signing in again. The app runs with one backend worker.
+- Lookup fields accept Salesforce record IDs. A lookup search is not included yet.
+- Salesforce handles custom validation rules, duplicate rules, dependent picklists and record-type restrictions. Any errors are shown in the form.
+
+## Documentation used
+
+- [Salesforce OAuth web server flow](https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm&type=5)
+- [Salesforce REST API](https://developer.salesforce.com/docs/platform/api-rest/guide/intro_rest.html)
+
+Abishek Budhiraja
