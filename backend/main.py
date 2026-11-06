@@ -49,6 +49,22 @@ def salesforce_url(value: str) -> str:
     return value.rstrip("/")
 
 
+def callback_address(value: str):
+    """Allow localhost HTTP or one explicitly configured public HTTPS callback."""
+    parsed = urlsplit(value)
+    host = parsed.hostname or ""
+    local = parsed.scheme == "http" and host in ("localhost", "127.0.0.1")
+    public = (parsed.scheme == "https" and parsed.port in (None, 443)
+              and "." in host and not host.endswith(".localhost")
+              and all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", part)
+                      for part in host.split("."))
+              and not re.fullmatch(r"[0-9.]+", host))
+    if (not (local or public) or parsed.path != "/auth/callback"
+            or parsed.query or parsed.fragment or parsed.username or parsed.password):
+        raise ValueError("Use a localhost HTTP or public HTTPS /auth/callback URL.")
+    return parsed
+
+
 @dataclass(frozen=True)
 class Settings:
     login_url: str = ""
@@ -73,21 +89,21 @@ class Settings:
         if not missing:
             try:
                 salesforce_url(self.login_url)
-                callback = urlsplit(self.callback_url)
-                if (callback.scheme != "http" or callback.hostname != "localhost"
-                        or callback.path != "/auth/callback" or callback.query or callback.fragment
-                        or callback.username or callback.password):
-                    raise ValueError("Invalid local callback")
+                callback_address(self.callback_url)
                 if self.api_version and not re.fullmatch(r"\d{2,3}\.0", self.api_version):
                     raise ValueError("Invalid API version")
             except ValueError:
-                missing.append("Valid My Domain, localhost callback and API version settings")
+                missing.append("Valid My Domain, localhost HTTP or public HTTPS callback, and API version settings")
         return missing
 
     @property
     def origin(self):
         parsed = urlsplit(self.callback_url)
         return f"{parsed.scheme}://{parsed.netloc}"
+
+    @property
+    def secure_cookies(self):
+        return urlsplit(self.callback_url).scheme == "https"
 
 
 @dataclass
@@ -135,7 +151,12 @@ def create_app(settings: Settings | None = None, transport=None):
     app = FastAPI(title="Salesforce Workspace", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.store = store
     app.state.settings = cfg
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
+    hosts = ["localhost", "127.0.0.1", "testserver"]
+    try:
+        hosts.append(callback_address(cfg.callback_url).hostname)
+    except ValueError:
+        pass
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
     @app.middleware("http")
     async def headers(request, call_next):
@@ -285,9 +306,12 @@ def create_app(settings: Settings | None = None, transport=None):
                 "org": urlsplit(current.instance_url).hostname if current else None}
 
     @app.get("/auth/login")
-    def login():
+    def login(request: Request):
         if cfg.missing():
             return RedirectResponse("/?auth_error=configuration", status_code=303)
+        # Start on the public host so the login cookie and callback share a host.
+        if cfg.secure_cookies and request.url.hostname != urlsplit(cfg.callback_url).hostname:
+            return RedirectResponse(cfg.origin + "/auth/login", status_code=303)
         store.prune()
         state, verifier, nonce = (secrets.token_urlsafe(48) for _ in range(3))
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
@@ -298,7 +322,7 @@ def create_app(settings: Settings | None = None, transport=None):
             "scope": "api refresh_token", "state": state, "code_challenge": challenge, "code_challenge_method": "S256",
         })
         response = RedirectResponse(url, status_code=303)
-        response.set_cookie(LOGIN_COOKIE, nonce, httponly=True, samesite="lax", max_age=600)
+        response.set_cookie(LOGIN_COOKIE, nonce, httponly=True, secure=cfg.secure_cookies, samesite="lax", max_age=600)
         return response
 
     @app.get("/auth/callback")
@@ -310,7 +334,7 @@ def create_app(settings: Settings | None = None, transport=None):
             raise HTTPException(400, "Invalid or expired login request. Start Salesforce login again.")
         if error or not code:
             response = RedirectResponse("/?auth_error=cancelled", status_code=303)
-            response.delete_cookie(LOGIN_COOKIE)
+            response.delete_cookie(LOGIN_COOKIE, secure=cfg.secure_cookies, httponly=True, samesite="lax")
             return response
         token = http.post(cfg.login_url + "/services/oauth2/token", data={
             "grant_type": "authorization_code", "code": code, "client_id": cfg.client_id,
@@ -318,7 +342,7 @@ def create_app(settings: Settings | None = None, transport=None):
         })
         if not token.is_success:
             response = RedirectResponse("/?auth_error=exchange", status_code=303)
-            response.delete_cookie(LOGIN_COOKIE)
+            response.delete_cookie(LOGIN_COOKIE, secure=cfg.secure_cookies, httponly=True, samesite="lax")
             return response
         try:
             data = token.json()
@@ -333,8 +357,8 @@ def create_app(settings: Settings | None = None, transport=None):
                 store.sessions.pop(old, None)
             store.sessions[sid] = connected
         response = RedirectResponse("/", status_code=303)
-        response.set_cookie(SESSION_COOKIE, sid, httponly=True, samesite="lax", max_age=SESSION_SECONDS)
-        response.delete_cookie(LOGIN_COOKIE)
+        response.set_cookie(SESSION_COOKIE, sid, httponly=True, secure=cfg.secure_cookies, samesite="lax", max_age=SESSION_SECONDS)
+        response.delete_cookie(LOGIN_COOKIE, secure=cfg.secure_cookies, httponly=True, samesite="lax")
         return response
 
     @app.post("/auth/logout")
@@ -346,7 +370,7 @@ def create_app(settings: Settings | None = None, transport=None):
         except httpx.RequestError:
             pass
         response = JSONResponse({"success": True})
-        response.delete_cookie(SESSION_COOKIE)
+        response.delete_cookie(SESSION_COOKIE, secure=cfg.secure_cookies, httponly=True, samesite="lax")
         return response
 
     @app.get("/api/objects")

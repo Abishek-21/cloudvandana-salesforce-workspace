@@ -2,6 +2,8 @@
 
 My submission for the CloudVandana Associate Software Engineer assignment.
 
+[Open the application](https://sanitary-motive-skipper.ngrok-free.dev) - available while the local server and ngrok are running. Salesforce sign-in with an authorized user in the configured org is required.
+
 This app connects to a Salesforce Developer Org and lets you manage Accounts, Opportunities, Leads, Contacts and Cases from one screen. It uses React for the frontend and Python with FastAPI for the backend. Records are read from and saved directly to Salesforce through its REST API.
 
 ## Features
@@ -59,6 +61,22 @@ Use your org's My Domain URL for the login URL. Leaving the API version blank le
 
 The `.env` file is excluded from Git. Keep the consumer secret there, on the backend. Salesforce CLI login is not required to run this app.
 
+## Remote review
+
+The local app can also be reached through an ngrok HTTPS tunnel. Install ngrok, connect your account, then set `SALESFORCE_CALLBACK_URL` to your assigned public domain followed by `/auth/callback`. Register that same URL in the Salesforce External Client App.
+
+With those settings in place, run:
+
+```sh
+sh run-review.sh
+```
+
+This builds the frontend, starts the local backend and forwards its port through ngrok. Keep the terminal open and the computer awake and connected. Control+C stops both processes. Stop an existing server on port 8008 before using this launcher.
+
+The public hostname is explicitly allowed by the backend. HTTPS login uses Secure, HttpOnly session cookies, and write requests must use the configured public origin. Request inspection is disabled in the tunnel command. Each browser signs in separately; sharing the link does not share a Salesforce session. Reviewers need an authorized user in the configured org.
+
+Ngrok's free plan displays a visitor notice before opening the app. The link is available while the local server and tunnel are running.
+
 ## How it works
 
 The React frontend calls the FastAPI backend, which handles login and sends requests to Salesforce. Access and refresh tokens stay on the server; the browser uses a session cookie. OAuth uses PKCE and a state check, and record changes require a CSRF token.
@@ -82,13 +100,15 @@ Pagination uses the last record's ID to fetch the next 20 records. Newly created
 npm run build
 ```
 
-On 6 November 2026, all 15 backend tests and the frontend build passed. Live checks in the Developer Org also passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
+On 6 November 2026, all 24 backend tests passed, including public HTTPS OAuth, secure cookies, host validation and origin checks. The frontend production build passed during the initial verification. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
+
+The public ngrok link was also checked for OAuth login, all five object views, record details and pagination reaching the end of the available records.
 
 More details are in [VERIFICATION.md](VERIFICATION.md).
 
 ## Current limitations
 
-- This version runs locally. Reviewers can clone the repository and connect their own Developer Org; the localhost link only works on the computer running the server.
+- This version runs locally, with optional remote access through ngrok. Reviewers can also clone the repository and connect their own Developer Org. The plain localhost link only works on the computer running the server.
 - Sessions are stored in memory, so restarting the server requires signing in again. The app runs with one backend worker.
 - Lookup fields accept Salesforce record IDs. A lookup search is not included yet.
 - Salesforce handles custom validation rules, duplicate rules, dependent picklists and record-type restrictions. Any errors are shown in the form.

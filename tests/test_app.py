@@ -154,3 +154,44 @@ def test_session_timeout(setup):
     s.expires = 0
     assert client.get('/api/objects/Account/records').status_code == 401
     assert not client.get('/api/session').json()['authenticated']
+
+
+def test_public_https_oauth_hosts_cookies_and_origin():
+    cfg = Settings(login_url='https://example.my.salesforce.com', client_id='test-client',
+                   client_secret='test-secret', callback_url='https://review.example.com/auth/callback')
+    assert not cfg.missing()
+    fake = FakeSalesforce()
+    app = create_app(cfg, transport=httpx.MockTransport(fake))
+    with TestClient(app, base_url='https://review.example.com') as client:
+        assert client.get('/api/session').status_code == 200
+        assert client.get('/api/session', headers={'Host': 'untrusted.example.com'}).status_code == 400
+        local = client.get('http://localhost:8008/auth/login', follow_redirects=False)
+        assert local.headers['location'] == 'https://review.example.com/auth/login'
+        response = client.get('/auth/login', follow_redirects=False)
+        assert 'Secure' in response.headers['set-cookie'] and 'HttpOnly' in response.headers['set-cookie']
+        query = parse_qs(urlsplit(response.headers['location']).query)
+        assert query['redirect_uri'] == [cfg.callback_url]
+        response = client.get('/auth/callback', params={'state': query['state'][0], 'code': 'test-code'}, follow_redirects=False)
+        assert response.status_code == 303
+        cookies = response.headers.get_list('set-cookie')
+        assert all('Secure' in c and 'HttpOnly' in c for c in cookies)
+        token = client.get('/api/session').json()['csrfToken']
+        url = '/api/objects/Account/records'
+        assert client.post(url, json={'values': {'Name': 'CV test'}},
+                           headers={'X-CSRF-Token': token, 'Origin': cfg.origin}).status_code == 201
+        assert client.post(url, json={'values': {'Name': 'CV test'}},
+                           headers={'X-CSRF-Token': token, 'Origin': 'https://other.example.com'}).status_code == 403
+        response = client.post('/auth/logout', headers={'X-CSRF-Token': token, 'Origin': cfg.origin})
+        assert response.status_code == 200 and 'Secure' in response.headers['set-cookie']
+
+
+@pytest.mark.parametrize('callback', [
+    'http://review.example.com/auth/callback', 'https://review.example.com/auth/callback?extra=1',
+    'https://review.example.com/auth/callback#fragment', 'https://user:pass@review.example.com/auth/callback',
+    'https://*.example.com/auth/callback', 'https://review.example.com/not-the-callback',
+    'https://127.0.0.1/auth/callback', 'https://review.example.com:8008/auth/callback',
+])
+def test_rejects_invalid_public_callbacks(callback):
+    cfg = Settings(login_url='https://example.my.salesforce.com', client_id='test-client',
+                   client_secret='test-secret', callback_url=callback)
+    assert cfg.missing()

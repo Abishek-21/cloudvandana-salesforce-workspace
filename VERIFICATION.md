@@ -47,4 +47,20 @@ The local `.env` file is ignored by Git and is readable only by the local accoun
 
 - Provide the Git repository URL with the final application.
 - Include the updated resume when submitting.
-- Confirm the review method if the recipient expects to access the applicant's machine remotely: a localhost address is local to the computer running the app. The README supports a reviewer running their own copy with their own Developer Org and External Client App.
+- Arrange an authorized Salesforce user for interactive reviewer access, or demonstrate the app while signed in. Sessions are private to each browser; the public URL does not share the applicant's session.
+
+## Public HTTPS review link
+
+On 6 November 2026, remote access was configured at `https://sanitary-motive-skipper.ngrok-free.dev`, forwarding to the local server on port 8008. The user approved registering the exact public `/auth/callback` URL in the Salesforce External Client App, and Salesforce confirmed the save. Existing OAuth scopes were retained.
+
+- Local and public HTTP checks returned 200.
+- OAuth login completed through the public address and returned to a connected workspace.
+- Account, Opportunity, Lead, Contact and Case metadata and record views loaded successfully.
+- An Account detail dialog loaded successfully.
+- Contact and Case each initially displayed 20 records. Scrolling requested the next page and correctly displayed the end-of-records state with 20 total records.
+- No new records were created or changed during these public-link checks. The earlier live CRUD results above cover record mutations.
+- The final browser view had no captured console warnings or errors.
+- All 24 automated backend tests passed, including new public-host OAuth, Secure/HttpOnly cookies, canonical login, host validation, origin enforcement and invalid callback checks.
+- Both launch scripts passed shell syntax checks.
+
+The public hostname is explicitly allowed. Cookies are Secure for the HTTPS callback. The ngrok command disables request inspection, and tokens remain in the backend. The public link requires the local server, tunnel and internet connection to remain active.
