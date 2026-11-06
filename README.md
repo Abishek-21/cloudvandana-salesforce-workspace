@@ -2,7 +2,7 @@
 
 My submission for the CloudVandana Associate Software Engineer assignment.
 
-[Open the application](https://sanitary-motive-skipper.ngrok-free.dev) - available while the local server and ngrok are running. Salesforce sign-in with an authorized user in the configured org is required.
+[Open the application](https://cloudvandana-abishek-budhiraja.onrender.com) - hosted on Render, independently of my computer. Salesforce sign-in with an authorized user in the configured org is required. The free service can take about a minute to wake after inactivity.
 
 This app connects to a Salesforce Developer Org and lets you manage Accounts, Opportunities, Leads, Contacts and Cases from one screen. It uses React for the frontend and Python with FastAPI for the backend. Records are read from and saved directly to Salesforce through its REST API.
 
@@ -108,7 +108,7 @@ Pagination uses the last record's ID to fetch the next 20 records. Newly created
 npm run build
 ```
 
-On 6 November 2026, all 25 backend tests passed, including public HTTPS OAuth, secure cookies, host validation, origin checks and the cloud health endpoint. The frontend production build passed. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
+On 6 November 2026, all 26 backend tests passed, including public HTTPS OAuth, secure cookies, host validation, origin checks, the cloud health endpoint and initial Render hostname handling. The frontend production build passed. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
 
 The public ngrok link was also checked for OAuth login, all five object views, record details and pagination reaching the end of the available records.
 

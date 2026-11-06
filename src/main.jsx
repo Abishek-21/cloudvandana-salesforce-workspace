@@ -92,7 +92,7 @@ function App() {
     setSessionError('');
     try {
       const response = await fetch('/api/session', { credentials: 'same-origin' });
-      if (!response.ok) throw new Error('The local server is unavailable. Check that it is running and try again.');
+      if (!response.ok) throw new Error('The server is unavailable. Please try again shortly.');
       setSession(await response.json());
     } catch (err) { setSessionError(err.message); }
   }, []);
@@ -195,8 +195,8 @@ function App() {
       <div className="topbar-right"><span className={`connection-pill ${authenticated ? 'connected' : ''}`}><span className="dot"/>{authenticated ? 'Connected' : 'Not connected'}</span>{authenticated && <button className="text-button" onClick={logout} disabled={working}>Log out</button>}</div>
     </header>
     <main>
-      <div className="page-heading"><div><p className="eyebrow">SALESFORCE RECORD MANAGEMENT</p><h1>Your customer workspace.</h1><p className="subtitle">Five objects. One clear view of the work.</p></div><span className="local-label"><Icon name="shield" size={16}/> Local application</span></div>
-      {sessionError ? <div className="error-panel" role="alert"><h2>Could not connect to the local server</h2><p>{sessionError}</p><button className="button secondary" onClick={loadSession}>Try again</button></div> : !session ? <div className="loading-panel" role="status"><span className="spinner"/> Opening your workspace…</div> : !authenticated ? <>
+      <div className="page-heading"><div><p className="eyebrow">SALESFORCE RECORD MANAGEMENT</p><h1>Your customer workspace.</h1><p className="subtitle">Five objects. One clear view of the work.</p></div><span className="local-label"><Icon name="shield" size={16}/> Salesforce integration</span></div>
+      {sessionError ? <div className="error-panel" role="alert"><h2>Could not connect to the server</h2><p>{sessionError}</p><button className="button secondary" onClick={loadSession}>Try again</button></div> : !session ? <div className="loading-panel" role="status"><span className="spinner"/> Opening your workspace…</div> : !authenticated ? <>
         {authError && <div className="banner error" role="alert">{authError}</div>}
         {error && <div className="banner error" role="alert">{error}</div>}
         <section className="login-panel"><div className="login-copy"><span className="feature-icon"><Icon name="database" size={30}/></span><p className="eyebrow">LET’S GET CONNECTED</p><h2>Your Salesforce records,<br/>ready to work with.</h2><p>Sign in to your Developer Org to browse records, make changes and keep your customer information up to date.</p>
