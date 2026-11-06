@@ -156,6 +156,14 @@ def create_app(settings: Settings | None = None, transport=None):
         hosts.append(callback_address(cfg.callback_url).hostname)
     except ValueError:
         pass
+    # Render's assigned hostname is available before Salesforce is configured.
+    # This lets the health check work during the first deploy without a wildcard.
+    render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME", "")
+    if render_host:
+        try:
+            hosts.append(callback_address(f"https://{render_host}/auth/callback").hostname)
+        except ValueError:
+            pass
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
     @app.middleware("http")

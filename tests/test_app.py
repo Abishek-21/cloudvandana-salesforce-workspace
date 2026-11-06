@@ -163,6 +163,14 @@ def test_health_check_is_available_without_salesforce_login(setup):
     assert not fake.requests
 
 
+def test_render_hostname_allows_initial_health_before_oauth_setup(monkeypatch):
+    monkeypatch.setenv('RENDER_EXTERNAL_HOSTNAME', 'assignment-demo.onrender.com')
+    with TestClient(create_app(Settings()), base_url='https://assignment-demo.onrender.com') as client:
+        assert client.get('/healthz').json() == {'status': 'ok'}
+        assert not client.get('/api/session').json()['configured']
+        assert client.get('/healthz', headers={'Host': 'another-service.onrender.com'}).status_code == 400
+
+
 def test_public_https_oauth_hosts_cookies_and_origin():
     cfg = Settings(login_url='https://example.my.salesforce.com', client_id='test-client',
                    client_secret='test-secret', callback_url='https://review.example.com/auth/callback')
