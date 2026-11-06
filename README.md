@@ -2,52 +2,77 @@
 
 My submission for the CloudVandana Associate Software Engineer assignment.
 
-[Open the application](https://cloudvandana-abishek-budhiraja.onrender.com) - hosted on Render, independently of my computer. Salesforce sign-in with an authorized user in the configured org is required. The free service can take about a minute to wake after inactivity.
+**Live app:** [cloudvandana-abishek-budhiraja.onrender.com](https://cloudvandana-abishek-budhiraja.onrender.com)
 
-This app connects to a Salesforce Developer Org and lets you manage Accounts, Opportunities, Leads, Contacts and Cases from one screen. It uses React for the frontend and Python with FastAPI for the backend. Records are read from and saved directly to Salesforce through its REST API.
+The app is hosted on Render and works independently of my computer. The free service sleeps after inactivity, so the first visit can take about a minute to load. Salesforce sign-in with an authorized user in the configured Developer Org is required.
 
-## Features
+## About the app
 
-- Sign in to Salesforce using OAuth 2.0 through an External Client App.
+This app lets you manage Accounts, Opportunities, Leads, Contacts and Cases from one screen. I used React for the interface and Python with FastAPI for the backend. The backend connects to Salesforce through its REST API, and Salesforce stores the records.
+
+You can:
+
+- Sign in through a Salesforce External Client App using OAuth 2.0 with PKCE.
 - Switch between the five objects using a dropdown.
-- View records and create, edit or delete them.
-- Display 9 fields for each object and 10 for Case, with form labels and field settings taken from Salesforce.
-- Load 20 records initially, then load the next 20 when scrolling to the bottom. There is also a button to load more.
-- Show Salesforce validation errors and respect the signed-in user's permissions.
+- View, create, edit and delete records.
+- See nine fields per object and ten for Case, with labels, types and picklist values taken from Salesforce metadata.
+- Load 20 records initially, then load the next page when scrolling to the bottom. A load-more button is also available.
+- See validation errors returned by Salesforce. The signed-in user's permissions apply to every operation.
 
-## Run locally
+## Using the hosted app
 
-The app was tested on macOS with Python 3.13 and Node.js 22.17. You will also need a Salesforce Developer Org and an External Client App configured as described below.
+Open the live link, click **Log in to Salesforce**, and sign in as an authorized user in the connected org. Once connected, choose an object to view its records.
 
-```sh
-git clone https://github.com/Abishek-21/cloudvandana-salesforce-workspace.git
-cd cloudvandana-salesforce-workspace
-cp .env.example .env
-```
+Each browser has its own session. The public link does not share my login, and an account in a different Salesforce org cannot automatically access this configured org. Review access needs to be arranged separately.
 
-Fill in the Salesforce settings in `.env`, then run:
+The server keeps access and refresh tokens in memory. A restart or an idle shutdown clears login sessions, so users sign in again. This does not remove records from Salesforce.
 
-```sh
-sh run-local.sh
-```
+## How it works
 
-The script creates a Python environment, installs missing dependencies, builds the frontend and starts the server. Open [http://localhost:8008](http://localhost:8008), then sign in to Salesforce.
+React sends requests to FastAPI. The backend handles OAuth, reads object metadata, validates requests and calls Salesforce. Consumer credentials and tokens stay on the backend; the browser uses an HttpOnly session cookie, marked Secure for HTTPS. Write requests also require a CSRF token and check the request origin.
 
-Use `Control+C` to stop the server. Restart it after changing `.env`.
+Forms use Salesforce metadata for field labels, types, active picklist values, required fields and edit permissions. Extra required fields can replace optional fields within the ten-field limit. If an org's requirements cannot fit within that limit, the app shows an error.
 
-## Connect Salesforce
+Pagination uses `ORDER BY Id ASC LIMIT 20`. The next request adds `WHERE Id > '<last record ID>'`. Newly created records appear at the top; reloading restores the normal ID order. Duplicate IDs are removed between pages.
 
-In your Developer Org's Setup, create a local **External Client App** with these settings:
+## Project files
+
+| File or folder | Purpose |
+| --- | --- |
+| `src/main.jsx` | Object dropdown, records table, forms and pagination |
+| `src/styles.css` | Layout and styling |
+| `backend/main.py` | OAuth, sessions, metadata, validation and Salesforce API calls |
+| `tests/` | Backend tests with mock Salesforce responses |
+| `Dockerfile` | Builds React and packages the Python server |
+| `.dockerignore` | Keeps local credentials and unnecessary files out of the build context |
+| `render.yaml` | Free Render service template and environment variable names |
+| `.env.example` | Local configuration template |
+| `run-local.sh` | Local setup and startup script |
+| `run-review.sh` | Optional local ngrok launcher; not used by the hosted app |
+| `VERIFICATION.md` | Detailed test and deployment results |
+| `WALKTHROUGH.md` | Request flows and demo notes |
+
+## Salesforce configuration
+
+To run your own copy, use your own Developer Org and create an **External Client App** in Setup:
 
 | Setting | Value |
 | --- | --- |
-| App name | CloudVandana Salesforce Workspace |
-| Callback URL | `http://localhost:8008/auth/callback` |
+| App name | CloudVandana Salesforce Workspace, or a name of your choice |
+| Distribution | Local |
 | OAuth scopes | `api` and `refresh_token` / `offline_access` |
-| Flow | Authorization code / web server flow with PKCE |
+| Authentication | Authorization code / web server flow with PKCE |
 | Consumer secret | Required for the web server and refresh token flows |
+| Callback for local development | `http://localhost:8008/auth/callback` |
+| Callback for a cloud deployment | Your service's HTTPS URL followed by `/auth/callback` |
 
-Allow your user to authorize the app in its OAuth policies. Copy the consumer key and secret into `.env`:
+Allow the intended org user to authorize the app under its OAuth policies. The callback registered in Salesforce must exactly match `SALESFORCE_CALLBACK_URL` for that deployment. The current hosted app uses:
+
+```text
+https://cloudvandana-abishek-budhiraja.onrender.com/auth/callback
+```
+
+These are the backend settings:
 
 ```dotenv
 SALESFORCE_LOGIN_URL=https://YOUR-DOMAIN.my.salesforce.com
@@ -57,75 +82,67 @@ SALESFORCE_CALLBACK_URL=http://localhost:8008/auth/callback
 SALESFORCE_API_VERSION=
 ```
 
-Use your org's My Domain URL for the login URL. Leaving the API version blank lets the backend discover it from Salesforce. The callback URL must match the External Client App exactly.
+Use your org's My Domain URL for `SALESFORCE_LOGIN_URL`. Leaving the API version blank lets the backend discover it. Use the cloud callback instead of localhost when deploying to Render.
 
-The `.env` file is excluded from Git. Keep the consumer secret there, on the backend. Salesforce CLI login is not required to run this app.
+For local development, put these settings in `.env`. For Render, put them in the service's environment settings. The `.env` file is excluded from Git. Salesforce CLI login is not required.
 
-## Remote review
+## Run locally
 
-For review without keeping a local computer running, the repository includes a `Dockerfile` and Render Blueprint (`render.yaml`). Create a free Docker Web Service on Render using this repository. Set the four Salesforce environment variables in Render, using the service's public HTTPS URL followed by `/auth/callback` for the callback. Register that exact callback in the Salesforce External Client App. Use `/healthz` for the health check.
-
-The image builds React and serves it from the Python backend. It binds to Render's `PORT` on `0.0.0.0`, runs as a non-root user and excludes local credentials from its build context. Credentials are supplied through the hosting environment, not the Dockerfile or Git.
-
-Render's free service sleeps after inactivity and wakes on a visit. Waking may take about a minute. In-memory login sessions clear after a restart or sleep, so users sign in again; records remain in Salesforce. Each browser still needs an authorized Salesforce login in the configured org.
-
-### Local tunnel alternative
-
-The local app can also be reached through an ngrok HTTPS tunnel. Install ngrok, connect your account, then set `SALESFORCE_CALLBACK_URL` to your assigned public domain followed by `/auth/callback`. Register that same URL in the Salesforce External Client App.
-
-With those settings in place, run:
+Tested with Python 3.13 and Node.js 22.17 on macOS. Configure the Salesforce app above with the localhost callback, then run:
 
 ```sh
-sh run-review.sh
+git clone https://github.com/Abishek-21/cloudvandana-salesforce-workspace.git
+cd cloudvandana-salesforce-workspace
+cp .env.example .env
 ```
 
-This builds the frontend, starts the local backend and forwards its port through ngrok. Keep the terminal open and the computer awake and connected. Control+C stops both processes. Stop an existing server on port 8008 before using this launcher.
+Fill in `.env` with your own connection settings, then start the app:
 
-The public hostname is explicitly allowed by the backend. HTTPS login uses Secure, HttpOnly session cookies, and write requests must use the configured public origin. Request inspection is disabled in the tunnel command. Each browser signs in separately; sharing the link does not share a Salesforce session. Reviewers need an authorized user in the configured org.
+```sh
+sh run-local.sh
+```
 
-Ngrok's free plan displays a visitor notice before opening the app. The link is available while the local server and tunnel are running.
+The script creates a Python environment if needed, installs missing dependencies, builds React and starts FastAPI at [http://localhost:8008](http://localhost:8008). Keep that terminal open while developing. Control+C stops the server. Restart after changing `.env`.
 
-## How it works
+## Deploy your own copy to Render
 
-The React frontend calls the FastAPI backend, which handles login and sends requests to Salesforce. Access and refresh tokens stay on the server; the browser uses a session cookie. OAuth uses PKCE and a state check, and record changes require a CSRF token.
+1. Create a **Web Service** from this repository, using the **Docker** runtime.
+2. Select the **Free** compute plan and set the health check path to `/healthz`. The included `render.yaml` provides the equivalent Blueprint template.
+3. Set the four required Salesforce environment variables from the configuration section. Use your own service's HTTPS callback URL.
+4. Register that exact callback in your Salesforce External Client App.
+5. Deploy and test Salesforce login through the cloud URL.
 
-The backend reads Salesforce object metadata to get field labels, types, picklist values and required fields. If an org has extra required fields, it replaces optional fields while keeping the form within the assignment's ten-field limit.
+The Docker image builds the frontend and serves it through FastAPI. It runs as a non-root user and listens on `0.0.0.0` using Render's `PORT`. The app uses one backend worker because sessions are stored in process memory.
 
-Pagination uses the last record's ID to fetch the next 20 records. Newly created records appear at the top so they are easy to find. Reloading restores the normal ID order.
-
-| File | Purpose |
-| --- | --- |
-| `src/main.jsx` | Object selector, records table and forms |
-| `src/styles.css` | Page layout and styling |
-| `backend/main.py` | OAuth, sessions and Salesforce API calls |
-| `tests/` | Backend tests with mock Salesforce responses |
-| `run-local.sh` | Local setup and startup script |
+For the current service, code updates are deployed through **Manual Deploy → Deploy latest commit** in Render after pushing to GitHub. No local server or ngrok process is needed for the Render deployment.
 
 ## Testing
+
+After setting up the local dependencies:
 
 ```sh
 .venv/bin/python -m pytest -q
 npm run build
 ```
 
-On 6 November 2026, all 26 backend tests passed, including public HTTPS OAuth, secure cookies, host validation, origin checks, the cloud health endpoint and initial Render hostname handling. The frontend production build passed. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
+On 6 November 2026, all 26 backend tests and the frontend production build passed. Testing covered OAuth state and PKCE, sessions, permissions, validation, CRUD, pagination, CSRF, HTTPS cookies, allowed hosts and cloud health checks.
 
-The public ngrok link was also checked for OAuth login, all five object views, record details and pagination reaching the end of the available records.
+Real-org CRUD was verified for all five objects, and the temporary test records were removed afterwards. Render built and deployed the Docker image successfully. Cloud login, all five object views, record details and pagination end-of-records handling were checked after the local server and ngrok were stopped.
 
-The Render deployment passed the same login and read checks after the local server and ngrok were stopped. Render built the Docker image successfully, and the cloud health endpoint stayed available independently of the local processes.
+See [VERIFICATION.md](VERIFICATION.md) for the full results.
 
-More details are in [VERIFICATION.md](VERIFICATION.md).
+## Limitations
 
-## Current limitations
-
-- The app supports local running, ngrok access and cloud deployment. The plain localhost link only works on the computer running the server. A free cloud service may have a cold start after inactivity.
-- Sessions are stored in memory, so restarting the server requires signing in again. The app runs with one backend worker.
-- Lookup fields accept Salesforce record IDs. A lookup search is not included yet.
-- Salesforce handles custom validation rules, duplicate rules, dependent picklists and record-type restrictions. Any errors are shown in the form.
+- The free Render instance has a wake-up delay after inactivity.
+- Sessions are cleared on restart or shutdown, and the app runs with one backend worker.
+- Lookup fields accept Salesforce record IDs; lookup search is not included.
+- Salesforce enforces custom validation rules, duplicate rules, dependent picklists and record-type restrictions. Errors are shown in the form.
 
 ## Documentation used
 
 - [Salesforce OAuth web server flow](https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm&type=5)
 - [Salesforce REST API](https://developer.salesforce.com/docs/platform/api-rest/guide/intro_rest.html)
+- [Render Docker deployment](https://render.com/docs/docker)
+- [Render free-service limits](https://render.com/docs/free)
 
 Abishek Budhiraja
