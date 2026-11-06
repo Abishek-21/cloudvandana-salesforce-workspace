@@ -63,6 +63,14 @@ The `.env` file is excluded from Git. Keep the consumer secret there, on the bac
 
 ## Remote review
 
+For review without keeping a local computer running, the repository includes a `Dockerfile` and Render Blueprint (`render.yaml`). Create a free Docker Web Service on Render using this repository. Set the four Salesforce environment variables in Render, using the service's public HTTPS URL followed by `/auth/callback` for the callback. Register that exact callback in the Salesforce External Client App. Use `/healthz` for the health check.
+
+The image builds React and serves it from the Python backend. It binds to Render's `PORT` on `0.0.0.0`, runs as a non-root user and excludes local credentials from its build context. Credentials are supplied through the hosting environment, not the Dockerfile or Git.
+
+Render's free service sleeps after inactivity and wakes on a visit. Waking may take about a minute. In-memory login sessions clear after a restart or sleep, so users sign in again; records remain in Salesforce. Each browser still needs an authorized Salesforce login in the configured org.
+
+### Local tunnel alternative
+
 The local app can also be reached through an ngrok HTTPS tunnel. Install ngrok, connect your account, then set `SALESFORCE_CALLBACK_URL` to your assigned public domain followed by `/auth/callback`. Register that same URL in the Salesforce External Client App.
 
 With those settings in place, run:
@@ -100,7 +108,7 @@ Pagination uses the last record's ID to fetch the next 20 records. Newly created
 npm run build
 ```
 
-On 6 November 2026, all 24 backend tests passed, including public HTTPS OAuth, secure cookies, host validation and origin checks. The frontend production build passed during the initial verification. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
+On 6 November 2026, all 25 backend tests passed, including public HTTPS OAuth, secure cookies, host validation, origin checks and the cloud health endpoint. The frontend production build passed. Live checks in the Developer Org passed for login, create, view, update and delete across all five objects. Pagination was checked with 35 Account records. All 29 temporary records created for testing were deleted afterwards.
 
 The public ngrok link was also checked for OAuth login, all five object views, record details and pagination reaching the end of the available records.
 
@@ -108,7 +116,7 @@ More details are in [VERIFICATION.md](VERIFICATION.md).
 
 ## Current limitations
 
-- This version runs locally, with optional remote access through ngrok. Reviewers can also clone the repository and connect their own Developer Org. The plain localhost link only works on the computer running the server.
+- The app supports local running, ngrok access and cloud deployment. The plain localhost link only works on the computer running the server. A free cloud service may have a cold start after inactivity.
 - Sessions are stored in memory, so restarting the server requires signing in again. The app runs with one backend worker.
 - Lookup fields accept Salesforce record IDs. A lookup search is not included yet.
 - Salesforce handles custom validation rules, duplicate rules, dependent picklists and record-type restrictions. Any errors are shown in the form.

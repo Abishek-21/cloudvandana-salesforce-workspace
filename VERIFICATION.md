@@ -64,3 +64,9 @@ On 6 November 2026, remote access was configured at `https://sanitary-motive-ski
 - Both launch scripts passed shell syntax checks.
 
 The public hostname is explicitly allowed. Cookies are Secure for the HTTPS callback. The ngrok command disables request inspection, and tokens remain in the backend. The public link requires the local server, tunnel and internet connection to remain active.
+
+## Independent cloud deployment preparation
+
+A multi-stage Dockerfile builds the React frontend and runs the FastAPI backend as a non-root user on the platform's `PORT`. The Docker build context uses an allowlist, excluding `.env`, local environments, Git metadata and test data. The Render Blueprint declares a free web service and prompts for the four Salesforce settings without committing their values. `/healthz` provides a public, non-sensitive health check.
+
+After these changes, 25 backend tests and the frontend production build passed. Docker is not installed on the local Mac, so the image build and cloud runtime still need verification on the hosting platform. These preparation results do not establish a successful cloud deployment.

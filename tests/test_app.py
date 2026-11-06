@@ -156,6 +156,13 @@ def test_session_timeout(setup):
     assert not client.get('/api/session').json()['authenticated']
 
 
+def test_health_check_is_available_without_salesforce_login(setup):
+    client, fake, app, session = setup
+    client.cookies.clear()
+    assert client.get('/healthz').json() == {'status': 'ok'}
+    assert not fake.requests
+
+
 def test_public_https_oauth_hosts_cookies_and_origin():
     cfg = Settings(login_url='https://example.my.salesforce.com', client_id='test-client',
                    client_secret='test-secret', callback_url='https://review.example.com/auth/callback')

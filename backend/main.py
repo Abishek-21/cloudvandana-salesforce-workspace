@@ -297,6 +297,10 @@ def create_app(settings: Settings | None = None, transport=None):
                 raise HTTPException(422, "Complete required fields: " + ", ".join(missing))
         return payload.values
 
+    @app.get("/healthz")
+    def health():
+        return {"status": "ok"}
+
     @app.get("/api/session")
     def session_info(request: Request):
         store.prune()
