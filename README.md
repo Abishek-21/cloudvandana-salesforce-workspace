@@ -112,6 +112,8 @@ On 6 November 2026, all 26 backend tests passed, including public HTTPS OAuth, s
 
 The public ngrok link was also checked for OAuth login, all five object views, record details and pagination reaching the end of the available records.
 
+The Render deployment passed the same login and read checks after the local server and ngrok were stopped. Render built the Docker image successfully, and the cloud health endpoint stayed available independently of the local processes.
+
 More details are in [VERIFICATION.md](VERIFICATION.md).
 
 ## Current limitations

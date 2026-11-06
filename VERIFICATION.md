@@ -69,4 +69,22 @@ The public hostname is explicitly allowed. Cookies are Secure for the HTTPS call
 
 A multi-stage Dockerfile builds the React frontend and runs the FastAPI backend as a non-root user on the platform's `PORT`. The Docker build context uses an allowlist, excluding `.env`, local environments, Git metadata and test data. The Render Blueprint declares a free web service and prompts for the four Salesforce settings without committing their values. `/healthz` provides a public, non-sensitive health check.
 
-After these changes, 25 backend tests and the frontend production build passed. Docker is not installed on the local Mac, so the image build and cloud runtime still need verification on the hosting platform. These preparation results do not establish a successful cloud deployment.
+The final preparation checks passed 26 backend tests and the frontend production build. Docker is not installed on the local Mac; the image was subsequently built and verified by Render as described below.
+
+## Independent Render deployment verified
+
+The app is deployed at `https://cloudvandana-abishek-budhiraja.onrender.com` on the Free Docker web service `cloudvandana-abishek-budhiraja`. Render service ID: `srv-dbmvv5jbc2fs73b2vr10`. The verified application deployment used commit `0d825e9a98ecee0cfe011f5af991b9a6f4ccf194`; later documentation-only commits do not change that runtime.
+
+With the user's approval, the existing Salesforce consumer settings were saved as environment variables on this service, and the Salesforce External Client App callback was changed to `https://cloudvandana-abishek-budhiraja.onrender.com/auth/callback`. Consumer credentials were not committed or printed. The selected compute plan is Free ($0/month).
+
+- Render reported the Docker build and deployment succeeded and the service was Live.
+- `/healthz` returned HTTP 200 with `{"status":"ok"}`.
+- Salesforce OAuth login completed through the Render URL and returned to the connected application.
+- All five object views loaded: 10 Accounts, 10 Opportunities, 0 Leads, 20 Contacts and 20 Cases, with nine fields per object and ten for Case.
+- An Account's view dialog displayed the record details.
+- Contact scrolling requested the next page and reached the correct end-of-records state with 20 total records.
+- No new records were created or changed during this cloud verification; the earlier real-org CRUD checks cover mutations.
+- The final cloud browser view had no captured warnings or errors.
+- The local assignment server and ngrok were stopped using their owned execution sessions. Their local endpoints no longer responded, while the Render health endpoint still returned 200. The deployment does not depend on the Mac being on.
+
+Free Render instances sleep after inactivity and may take about a minute to wake. Process restarts clear the app's in-memory sessions, requiring login again; Salesforce records remain stored in Salesforce. Interactive reviewers still need an authorized Salesforce user in the configured Developer Org.
