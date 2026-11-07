@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cloudvandana-salesforce-workspace
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: SALESFORCE_LOGIN_URL
+        sync: false
+      - key: SALESFORCE_CLIENT_ID
+        sync: false
+      - key: SALESFORCE_CLIENT_SECRET
+        sync: false
+      - key: SALESFORCE_CALLBACK_URL
+        sync: false

@@ -1,0 +1,13 @@
+.env
+.venv/
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.sf/
+.sfdx/
+*.log
+.DS_Store
+playwright-report/
+test-results/
+oauth-consent.png

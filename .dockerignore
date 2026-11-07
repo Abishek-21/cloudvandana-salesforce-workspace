@@ -1,0 +1,12 @@
+# Only the files needed to build the app enter the Docker build context.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!src/
+!src/**
+!backend/
+!backend/*.py
+!requirements.lock.txt
